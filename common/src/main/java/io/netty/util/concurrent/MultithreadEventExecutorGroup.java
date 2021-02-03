@@ -66,6 +66,16 @@ public abstract class MultithreadEventExecutorGroup extends AbstractEventExecuto
      * @param chooserFactory    the {@link EventExecutorChooserFactory} to use.
      * @param args              arguments which will passed to each {@link #newChild(Executor, Object...)} call
      */
+    /**
+     * 1、创建NioEventLoopGroup的线程执行器——ThreadPerTaskExcutor,它是对Java的线程池接口的实现，负责创建NioEventLoopGroup的底层Java线程Thread
+     * 2、for循环+newChild(executor,args)方法，去构造nThreads个NioEventLoop对象。
+     *注意到第一行红线处，即for循环前面的属性children，它的类型是一个数组，即EventExecutor[]，
+     * 由此可知EventLoopGroup实现的线程池其实就是类MultithreadEventExecutorGroup内部维护的类型为EventExecutor[]的数组，其大小是nThreads，
+     * 而EventExecutor本身是一个Netty线程相关的接口，这样就构成了一个Netty线程池。其中，for循环调用newChild抽象方法，这里也是模板方法模式的运用
+     *在newChild构建线程时，同时会将刚刚创建的线程执行器——ThreadPerTaskExcutor当做参数传入，去合力创建线程池线程，这个线程就是前面说的NioEventLoop对象
+     *3、第2步的for循环完成后，接着创建NioEventLoopGroup的线程选择器——chooser，chooser的目的是可以给每个新连接Channel分配NioEventLoop线程。具体细节后续专题总结。
+     *
+     * */
     protected MultithreadEventExecutorGroup(int nThreads, Executor executor,
                                             EventExecutorChooserFactory chooserFactory, Object... args) {
         if (nThreads <= 0) {
@@ -154,6 +164,7 @@ public abstract class MultithreadEventExecutorGroup extends AbstractEventExecuto
      * Create a new EventExecutor which will later then accessible via the {@link #next()}  method. This method will be
      * called for each thread that will serve this {@link MultithreadEventExecutorGroup}.
      *
+     * 显然线程执行器——ThreadPerTaskExcutor会辅助创建NioEventLoopGroup对应的底层线程——NioEventLoop,因为最后调用了
      */
     protected abstract EventExecutor newChild(Executor executor, Object... args) throws Exception;
 

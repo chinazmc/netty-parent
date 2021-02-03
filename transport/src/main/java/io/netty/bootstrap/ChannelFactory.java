@@ -20,6 +20,9 @@ import io.netty.channel.Channel;
 /**
  * @deprecated Use {@link io.netty.channel.ChannelFactory} instead.
  */
+/**
+ * io.netty.channel.ChannelFactory ，Channel 工厂接口，用于创建 Channel 对象。
+ * */
 @Deprecated
 public interface ChannelFactory<T extends Channel> {
     /**

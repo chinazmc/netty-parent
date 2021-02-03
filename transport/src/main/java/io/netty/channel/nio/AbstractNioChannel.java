@@ -75,13 +75,21 @@ public abstract class AbstractNioChannel extends AbstractChannel {
      * @param parent            the parent {@link Channel} by which this instance was created. May be {@code null}
      * @param ch                the underlying {@link SelectableChannel} on which it operates
      * @param readInterestOp    the ops to set to receive data from the {@link SelectableChannel}
+     *
+     *ch 属性，Netty NIO Channel 对象，持有的 Java 原生 NIO 的 Channel 对象。
+     * readInterestOp 属性，感兴趣的读事件的操作位值。
+     * 目前笔者看了 AbstractNioMessageChannel 是 SelectionKey.OP_ACCEPT ， 而 AbstractNioByteChannel 是 SelectionKey.OP_READ 。
+     * 详细的用途，我们会在 「3.13.3 beginRead」 看到。
+     * 调用父 AbstractNioChannel 的构造方法。详细解析，见 「3.14.1.4 AbstractChannel」 。
+     * 调用 SelectableChannel#configureBlocking(false) 方法，设置 NIO Channel 为非阻塞。😈 这块代码是不是非常熟悉哟。
+     * 若发生异常，关闭 NIO Channel ，并抛出异常。
      */
     protected AbstractNioChannel(Channel parent, SelectableChannel ch, int readInterestOp) {
         super(parent);
-        this.ch = ch;
-        this.readInterestOp = readInterestOp;
+        this.ch = ch;//Netty NIO Channel 对象，持有的 Java 原生 NIO 的 Channel 对象。
+        this.readInterestOp = readInterestOp;//感兴趣的读事件的操作位值
         try {
-            ch.configureBlocking(false);
+            ch.configureBlocking(false);//设置 NIO Channel 为非阻塞
         } catch (IOException e) {
             try {
                 ch.close();
@@ -377,6 +385,17 @@ public abstract class AbstractNioChannel extends AbstractChannel {
         boolean selected = false;
         for (;;) {
             try {
+//                调用 #unwrappedSelector() 方法，返回 Java 原生 NIO Selector 对象。
+//                调用 #javaChannel() 方法，获得 Java 原生 NIO 的 Channel 对象。
+/**
+ * 【重要】调用 SelectableChannel#register(Selector sel, int ops, Object att) 方法，注册 Java 原生 NIO 的 Channel 对象到 Selector 对象上。
+ * 相信胖友对这块的代码是非常熟悉的，但是为什么感兴趣的事件是为 0 呢？正常情况下，对于服务端来说，需要注册 SelectionKey.OP_ACCEPT 事件呢！这样做的目的是( 摘自《Netty权威指南（第二版）》 )：
+ *
+ * 注册方式是多态的，它既可以被 NIOServerSocketChannel 用来监听客户端的连接接入，也可以注册 SocketChannel 用来监听网络读或者写操作。
+ * 通过 SelectionKey#interestOps(int ops) 方法可以方便地修改监听操作位。所以，此处注册需要获取 SelectionKey 并给 AbstractNIOChannel 的成员变量 selectionKey 赋值。
+ * 如果不理解，没关系，在下文中，我们会看到服务端对 SelectionKey.OP_ACCEPT 事件的关注。😈
+ * */
+
                 selectionKey = javaChannel().register(eventLoop().unwrappedSelector(), 0, this);
                 return;
             } catch (CancelledKeyException e) {
@@ -413,6 +432,11 @@ public abstract class AbstractNioChannel extends AbstractChannel {
         if ((interestOps & readInterestOp) == 0) {
             selectionKey.interestOps(interestOps | readInterestOp);
         }
+        /**
+         * 【重要】在最后几行，我们可以看到，调用 SelectionKey#interestOps(ops) 方法，
+         * 将我们创建 NioServerSocketChannel 时，设置的 readInterestOp = SelectionKey.OP_ACCEPT 添加为感兴趣的事件。
+         * 也就说，服务端可以开始处理客户端的连接事件。
+         * */
     }
 
     /**

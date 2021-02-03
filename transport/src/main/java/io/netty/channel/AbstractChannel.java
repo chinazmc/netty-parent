@@ -43,17 +43,20 @@ import java.util.concurrent.RejectedExecutionException;
 public abstract class AbstractChannel extends DefaultAttributeMap implements Channel {
 
     private static final InternalLogger logger = InternalLoggerFactory.getInstance(AbstractChannel.class);
-
+//父 Channel 对象
     private final Channel parent;
-    private final ChannelId id;
-    private final Unsafe unsafe;
-    private final DefaultChannelPipeline pipeline;
+    private final ChannelId id;//Channel 编号
+    private final Unsafe unsafe;//Unsafe 对象
+    private final DefaultChannelPipeline pipeline;//DefaultChannelPipeline 对象
     private final VoidChannelPromise unsafeVoidPromise = new VoidChannelPromise(this, false);
     private final CloseFuture closeFuture = new CloseFuture(this);
 
     private volatile SocketAddress localAddress;
     private volatile SocketAddress remoteAddress;
     private volatile EventLoop eventLoop;
+    /**
+     * 是否注册
+     */
     private volatile boolean registered;
     private boolean closeInitiated;
     private Throwable initialCloseCause;
@@ -70,9 +73,13 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
      */
     protected AbstractChannel(Channel parent) {
         this.parent = parent;
-        id = newId();
-        unsafe = newUnsafe();
-        pipeline = newChannelPipeline();
+        id = newId();// 创建 ChannelId 对象
+        /**
+         * 这就是为什么叫 Unsafe 的原因。按照上述官网类的英文注释，Unsafe 操作不允许被用户代码使用。这些函数是真正用于数据传输操作，必须被IO线程调用。
+         * 实际上，Channel 真正的具体操作，通过调用对应的 Unsafe 实现。😈 下文，我们将会看到。
+         * */
+        unsafe = newUnsafe();// 创建 Unsafe 对象//这里的 Unsafe 并不是我们常说的 Java 自带的sun.misc.Unsafe ，而是 io.netty.channel.Channel#Unsafe。
+        pipeline = newChannelPipeline();// 创建 DefaultChannelPipeline 对象
     }
 
     /**
@@ -420,6 +427,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
         private RecvByteBufAllocator.Handle recvHandle;
         private boolean inFlush0;
         /** true if the channel has never been registered, false otherwise */
+        //是否重未注册过，用于标记首次注册
         private boolean neverRegistered = true;
 
         private void assertEventLoop() {
@@ -452,18 +460,20 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
         @Override
         public final void register(EventLoop eventLoop, final ChannelPromise promise) {
             ObjectUtil.checkNotNull(eventLoop, "eventLoop");
+            // 校验未注册
             if (isRegistered()) {
                 promise.setFailure(new IllegalStateException("registered to an event loop already"));
                 return;
             }
+            // 校验 Channel 和 eventLoop 匹配
             if (!isCompatible(eventLoop)) {
                 promise.setFailure(
                         new IllegalStateException("incompatible event loop type: " + eventLoop.getClass().getName()));
                 return;
             }
-
+// 设置 Channel 的 eventLoop 属性
             AbstractChannel.this.eventLoop = eventLoop;
-
+            // 在 EventLoop 中执行注册逻辑
             if (eventLoop.inEventLoop()) {
                 register0(promise);
             } else {
@@ -489,19 +499,27 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
             try {
                 // check if the channel is still open as it could be closed in the mean time when the register
                 // call was outside of the eventLoop
-                if (!promise.setUncancellable() || !ensureOpen(promise)) {
+                if (!promise.setUncancellable() || !ensureOpen(promise)) {// 确保 Channel 是打开的
                     return;
                 }
+                // 记录是否为首次注册
                 boolean firstRegistration = neverRegistered;
+                // 执行注册逻辑
                 doRegister();
+                // 标记首次注册为 false
                 neverRegistered = false;
+                // 标记 Channel 为已注册
                 registered = true;
 
                 // Ensure we call handlerAdded(...) before we actually notify the promise. This is needed as the
                 // user may already fire events through the pipeline in the ChannelFutureListener.
+                /**
+                 * 触发 ChannelInitializer 执行，进行 Handler 初始化。也就是说，我们在 「4.init」 写的 ServerBootstrap 对 Channel 设置的 ChannelInitializer 将被执行，进行 Channel 的 Handler 的初始化。
+                 * */
                 pipeline.invokeHandlerAddedIfNeeded();
-
+// 回调通知 `promise` 执行成功。。我们向 regFuture 注册的 ChannelFutureListener ，就会被立即回调执行。
                 safeSetSuccess(promise);
+                // 触发通知已注册事件
                 pipeline.fireChannelRegistered();
                 // Only fire a channelActive if the channel has never been registered. This prevents firing
                 // multiple channel actives if the channel is deregistered and re-registered.
@@ -526,6 +544,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
 
         @Override
         public final void bind(final SocketAddress localAddress, final ChannelPromise promise) {
+            // 判断是否在 EventLoop 的线程中。判断是否在 EventLoop 的线程中。即该方法，只允许在 EventLoop 的线程中执行。
             assertEventLoop();
 
             if (!promise.setUncancellable() || !ensureOpen(promise)) {
@@ -539,22 +558,26 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                 !PlatformDependent.isWindows() && !PlatformDependent.maybeSuperUser()) {
                 // Warn a user about the fact that a non-root user can't receive a
                 // broadcast packet on *nix if the socket is bound on non-wildcard address.
+                //警告一个non-root用户不能接收到一个在*nix的广播数据包如果套接字绑定在非通配符地址
                 logger.warn(
                         "A non-root user can't receive a broadcast packet if the socket " +
                         "is not bound to a wildcard address; binding to a non-wildcard " +
                         "address (" + localAddress + ") anyway as requested.");
             }
-
-            boolean wasActive = isActive();
+// 记录 Channel 是否激活
+            boolean wasActive = isActive();//isActive方法NioServerSocketChannel 对该方法的实现，判断 ServerSocketChannel 是否绑定端口，此时，一般返回的是 false 。
+            // 绑定 Channel 的端口
             try {
+                //绑定 Channel 的端口。【重要】到了此处，服务端的 Java 原生 NIO ServerSocketChannel 终于绑定端口。
                 doBind(localAddress);
             } catch (Throwable t) {
                 safeSetFailure(promise, t);
                 closeIfClosed();
                 return;
             }
-
+// 若 Channel 是新激活的，触发通知 Channel 已激活的事件。  再次调用 #isActive() 方法，获得 Channel 是否激活。此时，一般返回的是 true 。因此，Channel 可以认为是新激活的，满足【第 36 至 43 行】代码的执行条件。
             if (!wasActive && isActive()) {
+                //提交任务，让代码执行异步化。
                 invokeLater(new Runnable() {
                     @Override
                     public void run() {
@@ -562,7 +585,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                     }
                 });
             }
-
+// 回调通知 promise 执行成功
             safeSetSuccess(promise);
         }
 
@@ -833,12 +856,13 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
 
         @Override
         public final void beginRead() {
+            // 判断是否在 EventLoop 的线程中。
             assertEventLoop();
-
+// Channel 必须激活
             if (!isActive()) {
                 return;
             }
-
+// 执行开始读取
             try {
                 doBeginRead();
             } catch (final Exception e) {
@@ -972,7 +996,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
             if (isOpen()) {
                 return true;
             }
-
+// 若未打开，回调通知 promise 异常
             safeSetFailure(promise, newClosedChannelException(initialCloseCause));
             return false;
         }
@@ -1015,6 +1039,17 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                 //         -> handlerA.channelInactive() - (2) another inbound handler method called while in (1) yet
                 //
                 // which means the execution of two inbound handler methods of the same handler overlap undesirably.
+                /**
+                 * 出站操作实现使用此方法稍后触发入站事件。
+                 * 它们不会立即触发入站事件，因为出站操作可能已启动
+                 * 由另一个入站事件处理程序方法触发。如果立即触发，则调用堆栈
+                 * 如下所示，例如：
+                 * handlerA.inboundBufferUpdated（）-（1）入站处理程序方法关闭连接。
+                 * -> handlerA.ctx.close()
+                 * ->  channel.unsafe.close()
+                 * -> handlerA.channelInactive()-（2）在（1）中调用了另一个入站处理程序方法
+                 * 这意味着同一个处理程序的两个入站处理程序方法的执行会出现不希望的重叠。
+                 * */
                 eventLoop().execute(task);
             } catch (RejectedExecutionException e) {
                 logger.warn("Can't invoke task later as EventLoop rejected it", e);

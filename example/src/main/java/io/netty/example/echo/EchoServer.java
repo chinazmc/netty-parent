@@ -32,6 +32,8 @@ import io.netty.handler.ssl.util.SelfSignedCertificate;
 import io.netty.util.concurrent.DefaultEventExecutorGroup;
 import io.netty.util.concurrent.EventExecutorGroup;
 
+import java.nio.channels.Selector;
+
 /**
  * Echoes back any received data from a client.
  */
@@ -41,6 +43,8 @@ public final class EchoServer {
     static final int PORT = Integer.parseInt(System.getProperty("port", "8007"));
 
     public static void main(String[] args) throws Exception {
+        Selector selector=Selector.open();
+
         // Configure SSL.
         // 配置 SSL
         final SslContext sslCtx;
@@ -75,17 +79,19 @@ public final class EchoServer {
                      }
                      //p.addLast(new LoggingHandler(LogLevel.INFO));
                      p.addLast(serverHandler);
-                     p.addLast();
                  }
              });
 
             // Start the server.
+            // 绑定端口，并同步等待成功，即启动服务端
             ChannelFuture f = b.bind(PORT).sync();
 
             // Wait until the server socket is closed.
+            // 监听服务端关闭，并阻塞等待
             f.channel().closeFuture().sync();
         } finally {
             // Shut down all event loops to terminate all threads.
+            // 优雅关闭两个 EventLoopGroup 对象
             bossGroup.shutdownGracefully();
             workerGroup.shutdownGracefully();
         }
