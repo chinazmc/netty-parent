@@ -975,6 +975,9 @@ public class DefaultChannelPipeline implements ChannelPipeline {
 
     @Override
     public final ChannelFuture connect(SocketAddress remoteAddress, ChannelPromise promise) {
+        /**
+         * 相信你对tail是什么不是很了解，可以翻到最开始，tail在创建pipeline的时候出现过，关于pipeline和tail对应的类
+         * */
         return tail.connect(remoteAddress, promise);
     }
 
@@ -1331,6 +1334,7 @@ public class DefaultChannelPipeline implements ChannelPipeline {
         @Override
         public void bind(
                 ChannelHandlerContext ctx, SocketAddress localAddress, ChannelPromise promise) {
+            //这里的unsafe就是前面提到的 AbstractUnsafe, 准确点，应该是 NioMessageUnsafe
             unsafe.bind(localAddress, promise);
         }
 

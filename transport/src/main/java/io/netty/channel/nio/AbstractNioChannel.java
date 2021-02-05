@@ -83,6 +83,10 @@ public abstract class AbstractNioChannel extends AbstractChannel {
      * 调用父 AbstractNioChannel 的构造方法。详细解析，见 「3.14.1.4 AbstractChannel」 。
      * 调用 SelectableChannel#configureBlocking(false) 方法，设置 NIO Channel 为非阻塞。😈 这块代码是不是非常熟悉哟。
      * 若发生异常，关闭 NIO Channel ，并抛出异常。
+     *
+     *
+     *这里，简单地将前面 provider.openServerSocketChannel(); 创建出来的 ServerSocketChannel 保存到成员变量，然后调用ch.configureBlocking(false);设置该channel为非阻塞模式，标准的jdk nio编程的玩法
+     * 这里的 readInterestOp 即前面层层传入的 SelectionKey.OP_ACCEPT，接下来重点分析 super(parent);(这里的parent其实是null，由前面写死传入)
      */
     protected AbstractNioChannel(Channel parent, SelectableChannel ch, int readInterestOp) {
         super(parent);

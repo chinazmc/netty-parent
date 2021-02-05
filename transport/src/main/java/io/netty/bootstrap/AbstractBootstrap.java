@@ -132,6 +132,7 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
      */
     /**
      * 设置要被实例化的 Channel 的类
+     * 此处应该要知道，我们在写demo的时候都会写.channel(NioServerSocketChannel.class);，就是用这个来创建ChannelFactory的
      * */
     public B channel(Class<? extends C> channelClass) {
 //        虽然传入的 channelClass 参数，但是会使用 io.netty.channel.ReflectiveChannelFactory 进行封装。
@@ -384,7 +385,8 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
             return new DefaultChannelPromise(new FailedChannel(), GlobalEventExecutor.INSTANCE).setFailure(t);//返回带异常的 DefaultChannelPromise 对象。因为创建 Channel 对象失败，所以需要创建一个 FailedChannel 对象，设置到 DefaultChannelPromise 中才可以返回。
         }
 // 注册 Channel 到 EventLoopGroup 中
-        ChannelFuture regFuture = config().group().register(channel);//首先获得 EventLoopGroup 对象，后调用 EventLoopGroup#register(Channel) 方法，注册 Channel 到 EventLoopGroup 中。实际在方法内部，EventLoopGroup 会分配一个 EventLoop 对象，将 Channel 注册到其上。
+        //首先获得 EventLoopGroup 对象，后调用 EventLoopGroup#register(Channel) 方法，注册 Channel 到 EventLoopGroup 中。实际在方法内部，EventLoopGroup 会分配一个 EventLoop 对象，将 Channel 注册到其上。
+        ChannelFuture regFuture = config().group().register(channel);
         if (regFuture.cause() != null) {
             if (channel.isRegistered()) {
                 channel.close();//若发生异常，并且 Channel 已经注册成功，则调用 #close() 方法，正常关闭 Channel 。

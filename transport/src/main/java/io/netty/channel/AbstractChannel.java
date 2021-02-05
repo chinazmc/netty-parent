@@ -73,12 +73,12 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
      */
     protected AbstractChannel(Channel parent) {
         this.parent = parent;
-        id = newId();// 创建 ChannelId 对象
+        id = newId();// 创建 ChannelId 对象,id是netty中每条channel的唯一标识
         /**
          * 这就是为什么叫 Unsafe 的原因。按照上述官网类的英文注释，Unsafe 操作不允许被用户代码使用。这些函数是真正用于数据传输操作，必须被IO线程调用。
          * 实际上，Channel 真正的具体操作，通过调用对应的 Unsafe 实现。😈 下文，我们将会看到。
          * */
-        unsafe = newUnsafe();// 创建 Unsafe 对象//这里的 Unsafe 并不是我们常说的 Java 自带的sun.misc.Unsafe ，而是 io.netty.channel.Channel#Unsafe。
+        unsafe = newUnsafe();// 创建 Unsafe 对象//这里的 Unsafe 并不是我们常说的 Java 自带的sun.misc.Unsafe ，而是 io.netty.channel.Channel#Unsafe。//我们可以先不用管TA是干嘛的，只需要知道这里的 newUnsafe方法最终属于类NioServerSocketChannel中
         pipeline = newChannelPipeline();// 创建 DefaultChannelPipeline 对象
     }
 
@@ -471,7 +471,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                         new IllegalStateException("incompatible event loop type: " + eventLoop.getClass().getName()));
                 return;
             }
-// 设置 Channel 的 eventLoop 属性
+// 设置 Channel 的 eventLoop 属性//先将EventLoop事件循环器绑定到该NioServerSocketChannel上，然后调用 register0()
             AbstractChannel.this.eventLoop = eventLoop;
             // 在 EventLoop 中执行注册逻辑
             if (eventLoop.inEventLoop()) {

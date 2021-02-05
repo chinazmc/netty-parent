@@ -52,13 +52,27 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
      * 子 Channel 的可选项集合
      */
     private final Map<ChannelOption<?>, Object> childOptions = new LinkedHashMap<ChannelOption<?>, Object>();
+    /**
+     * 子 Channel 的属性集合
+     */
     private final Map<AttributeKey<?>, Object> childAttrs = new ConcurrentHashMap<AttributeKey<?>, Object>();
     /**
      * 启动类配置对象
      */
     private final ServerBootstrapConfig config = new ServerBootstrapConfig(this);
+    /**
+     * 子 Channel 的 EventLoopGroup 对象
+     */
     private volatile EventLoopGroup childGroup;
+    /**
+     * 子 Channel 的处理器
+     */
     private volatile ChannelHandler childHandler;
+    /**
+     * 在 Server 接受一个 Client 的连接后，会创建一个对应的 Channel 对象。因此，我们看到 ServerBootstrap 的 childOptions、childAttrs、childGroup、childHandler 属性，
+     * 都是这种 Channel 的可选项集合、属性集合、EventLoopGroup 对象、处理器。下面，我们会看到 ServerBootstrap 针对这些配置项的设置方法。
+     * */
+
 
     public ServerBootstrap() { }
 
@@ -147,7 +161,9 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
             currentChildOptions = childOptions.entrySet().toArray(EMPTY_OPTION_ARRAY);
         }
         final Entry<AttributeKey<?>, Object>[] currentChildAttrs = childAttrs.entrySet().toArray(EMPTY_ATTRIBUTE_ARRAY);
-
+/**
+ * 到了最后一步，p.addLast()向serverChannel的流水线处理器中加入了一个 ServerBootstrapAcceptor，从名字上就可以看出来，这是一个接入器，专门接受新请求，把新的请求扔给某个事件循环器
+ * */
         p.addLast(new ChannelInitializer<Channel>() {
             @Override
             public void initChannel(final Channel ch) {

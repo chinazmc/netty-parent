@@ -89,6 +89,12 @@ public class NioServerSocketChannel extends AbstractNioMessageChannel
      */
     public NioServerSocketChannel(ServerSocketChannel channel) {
         /**
+         * 这里第一行代码就跑到父类里面去了，第二行，new出来一个 NioServerSocketChannelConfig，其顶层接口为 ChannelConfig，netty官方的描述如下
+         * A set of configuration properties of a Channel.
+         * 基本可以判定，ChannelConfig 也是netty里面的一大核心模块，初次看源码，看到这里，我们大可不必深挖这个对象，而是在用到的时候再回来深究，只要记住，这个对象在创建NioServerSocketChannel对象的时候被创建即可
+         * */
+
+        /**
          * 调用父 AbstractNioMessageChannel 的构造方法。注意传入的 SelectionKey 的值为 OP_ACCEPT 。
          * */
         super(null, channel, SelectionKey.OP_ACCEPT);
