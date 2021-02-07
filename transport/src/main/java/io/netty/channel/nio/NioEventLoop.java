@@ -431,6 +431,10 @@ public final class NioEventLoop extends SingleThreadEventLoop {
         }
     }
 
+    /**
+     * NioEventLoop 每次循环的处理流程都包含事件轮询 select、事件处理 processSelectedKeys、任务处理 runAllTasks 几个步骤，是典型的 Reactor 线程模型的运行机制。
+     * 而且 Netty 提供了一个参数 ioRatio，可以调整 I/O 事件处理和任务处理的时间比例。下面我们将着重从事件处理和任务处理两个核心部分出发，详细介绍 Netty EventLoop 的实现原理。
+     * */
     @Override
     protected void run() {
         int selectCnt = 0;
@@ -454,7 +458,8 @@ public final class NioEventLoop extends SingleThreadEventLoop {
                         nextWakeupNanos.set(curDeadlineNanos);
                         try {
                             if (!hasTasks()) {
-                                strategy = select(curDeadlineNanos);
+                                //首先轮询注册到reactor线程对用的selector上的所有的channel的IO事件
+                                strategy = select(curDeadlineNanos);// 轮询 I/O 事件
                             }
                         } finally {
                             // This update is just to help block unnecessary selector wakeups
@@ -481,22 +486,24 @@ public final class NioEventLoop extends SingleThreadEventLoop {
                 if (ioRatio == 100) {
                     try {
                         if (strategy > 0) {
-                            processSelectedKeys();
+                            processSelectedKeys();// 处理 I/O 事件
                         }
                     } finally {
                         // Ensure we always run tasks.
-                        ranTasks = runAllTasks();
+                        ranTasks = runAllTasks();// 处理所有任务
                     }
                 } else if (strategy > 0) {
                     final long ioStartTime = System.nanoTime();
                     try {
+//                        处理产生网络IO事件的channel
                         processSelectedKeys();
                     } finally {
                         // Ensure we always run tasks.
                         final long ioTime = System.nanoTime() - ioStartTime;
-                        ranTasks = runAllTasks(ioTime * (100 - ioRatio) / ioRatio);
+                        ranTasks = runAllTasks(ioTime * (100 - ioRatio) / ioRatio); // 处理完 I/O 事件，再处理异步任务队列
                     }
                 } else {
+//                    处理任务队列
                     ranTasks = runAllTasks(0); // This will run the minimum number of tasks
                 }
 

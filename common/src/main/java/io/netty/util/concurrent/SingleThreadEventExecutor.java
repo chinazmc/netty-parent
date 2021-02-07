@@ -827,6 +827,7 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
         boolean inEventLoop = inEventLoop();
         addTask(task);
         if (!inEventLoop) {
+            //外部线程在往任务队列里面添加任务的时候执行 startThread() ，netty会判断reactor线程有没有被启动，如果没有被启动，那就启动线程再往任务队列里面添加任务
             startThread();
             if (isShutdown()) {
                 boolean reject = false;
@@ -972,9 +973,17 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
         }
         return false;
     }
-
+/**
+ * SingleThreadEventExecutor 在执行doStartThread的时候，会调用内部执行器executor的execute方法，将调用NioEventLoop的run方法的过程封装成一个runnable塞到一个线程中去执行
+ * */
     private void doStartThread() {
         assert thread == null;
+
+/**
+ * 该线程就是executor创建，对应netty的reactor线程实体。executor 默认是ThreadPerTaskExecutor
+ *
+ * 默认情况下，ThreadPerTaskExecutor 在每次执行execute 方法的时候都会通过DefaultThreadFactory创建一个FastThreadLocalThread线程，而这个线程就是netty中的reactor线程实体
+ * */
         executor.execute(new Runnable() {
             @Override
             public void run() {

@@ -26,7 +26,7 @@ public class Test {
                        public void initChannel(SocketChannel ch) throws Exception{ }
                     });
             ChannelFuture f=b.bind(8888).sync();//这里就是真正的启动过程了，绑定8888端口，等待服务器启动完毕，才会进入下行代码
-            f.channel().closeFuture().sync();// 等待服务端关闭socket
+            f.channel().closeFuture().sync();// 等待服务端关闭socket//它会让线程进入 wait 状态，这样服务端可以一直处于运行状态，如果没有这行代码，bind 操作之后就会进入 finally 代码块，整个服务端就退出结束了。
 
         }finally {
             bossGroup.shutdownGracefully();
